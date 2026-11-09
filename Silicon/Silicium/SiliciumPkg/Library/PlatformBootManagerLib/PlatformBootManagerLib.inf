@@ -15,6 +15,7 @@
 
 [Sources]
   PlatformBootManagerLib.c
+  XnuLoader.c
 
 [Packages]
   MdePkg/MdePkg.dec
@@ -27,6 +28,7 @@
 [LibraryClasses]
   DebugLib
   BaseMemoryLib
+  BaseLib
   UefiBootServicesTableLib
   MemoryAllocationLib
   MsBootOptionsLib

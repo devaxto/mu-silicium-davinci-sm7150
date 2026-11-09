@@ -30,6 +30,8 @@
 
 #include <Configuration/BootDevices.h>
 
+#include "XnuLoader.h"
+
 //
 // Platform Consoles List
 //
@@ -261,6 +263,11 @@ PlatformBootManagerAfterConsole ()
 
   // Proccess Capsules
   ProcessCapsules ();
+
+#ifdef XNU_PAYLOAD_BOOT
+  // The RAM payload is the boot target; do not try installed boot options first.
+  XnuLoaderMain ();
+#endif
 }
 
 VOID
