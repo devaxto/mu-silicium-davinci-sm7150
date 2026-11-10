@@ -57,6 +57,22 @@ AddRamPartition (
 
   if (Length <= 0) { return; }
 
+  // Keep the reserved XNU Payload region (0xF0000000 .. 0xF4000000) intact
+  if (Base < 0xF0000000ULL && Base + Length > 0xF0000000ULL) {
+    AddRamPartition (Base, 0xF0000000ULL - Base, ArmAttributes, EfiMemoryType);
+    if (Base + Length > 0xF4000000ULL) {
+      AddRamPartition (0xF4000000ULL, (Base + Length) - 0xF4000000ULL, ArmAttributes, EfiMemoryType);
+    }
+    return;
+  }
+  if (Base >= 0xF0000000ULL && Base < 0xF4000000ULL) {
+    if (Base + Length <= 0xF4000000ULL) {
+      return;
+    }
+    Length = (Base + Length) - 0xF4000000ULL;
+    Base   = 0xF4000000ULL;
+  }
+
   switch (EfiMemoryType) {
     case EfiConventionalMemory:
       EfiGcdMemoryType = EfiGcdMemoryTypeSystemMemory;

@@ -266,8 +266,13 @@ StartPayloadLoader ()
   UnicodeSPrint (Message, sizeof (Message), L"HACKIOS DAVINCI: XNUP at 0x%lx, magic %08x, size %u\r\n", XNU_PAYLOAD_BASE, Header->Magic, Header->Size);
   gST->ConOut->OutputString (gST->ConOut, Message);
 #endif
+  Log ("[start_payload]\n");
+  Log ("base=%lx magic=%08x size=%x\n", (UINT64)XNU_PAYLOAD_BASE, Header->Magic, Header->Size);
+  FlushLog ();
 
   if (Header->Magic != XNU_PAYLOAD_MAGIC || Header->Size > XNU_PAYLOAD_MAX_SIZE) {
+    Log ("invalid magic or size\n");
+    FlushLog ();
     return;
   }
 
@@ -281,15 +286,22 @@ StartPayloadLoader ()
       break;
     }
 
+    Log ("entry name=%a size=%x\n", Entry->Name, Entry->Size);
+    FlushLog ();
+
     if (AsciiStrnCmp (Entry->Name, "loader.efi", sizeof (Entry->Name)) == 0) {
       EFI_HANDLE Handle;
 
       Status = gBS->LoadImage (FALSE, gImageHandle, NULL, Entry + 1, Entry->Size, &Handle);
+      Log ("LoadImage status=%r\n", Status);
+      FlushLog ();
       if (!EFI_ERROR (Status)) {
 #ifdef XNU_PAYLOAD_BOOT
         gST->ConOut->OutputString (gST->ConOut, L"HACKIOS DAVINCI: starting resident loader\r\n");
 #endif
         Status = gBS->StartImage (Handle, NULL, NULL);
+        Log ("StartImage status=%r\n", Status);
+        FlushLog ();
       }
 
 #ifdef XNU_PAYLOAD_BOOT
@@ -309,14 +321,6 @@ XnuLoaderMain ()
 {
   EFI_TIME Time;
 
-  // Normally does not return
-  StartPayloadLoader ();
-
-#ifdef XNU_PAYLOAD_BOOT
-  gST->ConOut->OutputString (gST->ConOut, L"HACKIOS DAVINCI: no resident loader running; reset in 30 seconds\r\n");
-  gBS->Stall (30000000);
-#endif
-
   mLog = AllocateZeroPool (LOG_SIZE);
   if (mLog != NULL) {
     Log ("== XNULOADER LOG v1 ==\n");
@@ -335,9 +339,21 @@ XnuLoaderMain ()
     LogPayload ();
     FlushLog ();
     LogPersistence ();
+    FlushLog ();
+  }
+
+  // Normally does not return
+  StartPayloadLoader ();
+
+  if (mLog != NULL) {
     Log ("== END ==\n");
     FlushLog ();
   }
+
+#ifdef XNU_PAYLOAD_BOOT
+  gST->ConOut->OutputString (gST->ConOut, L"HACKIOS DAVINCI: no resident loader running; reset in 5 seconds\r\n");
+  gBS->Stall (5000000);
+#endif
 
   // The phone is unattended: always come back to Android.
   gRT->ResetSystem (EfiResetCold, EFI_SUCCESS, 0, NULL);

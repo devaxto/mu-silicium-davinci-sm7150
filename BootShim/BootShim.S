@@ -30,7 +30,9 @@ skip_dtb:
 
 _CopyLoop:
   ldp   x2, x3, [x4], #16
-  stp   x2, x3, [x5], #16
+  stp   x2, x3, [x5]
+  dc    civac, x5
+  add   x5, x5, #16
   subs  x6, x6, #16
   b.ne  _CopyLoop
 
@@ -48,12 +50,16 @@ _CopyLoop:
 
 _PayloadLoop:
   ldp   x2, x3, [x4], #16
-  stp   x2, x3, [x5], #16
+  stp   x2, x3, [x5]
+  dc    civac, x5
+  add   x5, x5, #16
   subs  x6, x6, #16
   b.ne  _PayloadLoop
 
 _NoPayload:
 #endif
+  dsb   sy
+  isb
   ldr   x5, _StackBase
 
 _Entry:
