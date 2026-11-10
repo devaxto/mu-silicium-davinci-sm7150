@@ -217,6 +217,18 @@ CEntryPoint ()
   // Run SoC Specific Code
   PlatformInitialize ();
 
+  // Enable PingPong 0 tear-check autorefresh on SM7150 command-mode DSI panel
+  {
+    volatile UINT32 *PingPong = (volatile UINT32 *)(UINTN)0x0AE71000;
+    volatile UINT32 *Ctl      = (volatile UINT32 *)(UINTN)0x0AE02000;
+    if (PingPong[0] & 1U) {
+      PingPong[0x30 / 4] = BIT31 | 1U;
+      ArmDataSynchronizationBarrier ();
+      Ctl[0x1C / 4] = 1;
+      ArmDataSynchronizationBarrier ();
+    }
+  }
+
   //
   // !!! Make this Debug only !!!
   //

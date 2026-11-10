@@ -221,8 +221,10 @@ VOID
 EFIAPI
 PlatformBootManagerAfterConsole ()
 {
-  EFI_STATUS    Status   = EFI_SUCCESS;
   EFI_BOOT_MODE BootMode = GetBootModeHob ();
+
+#ifndef XNU_PAYLOAD_BOOT
+  EFI_STATUS    Status   = EFI_SUCCESS;
 
   // Platform DSDT Table Updates
   PlatformUpdateAcpiTables ();
@@ -235,6 +237,7 @@ PlatformBootManagerAfterConsole ()
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "%a: Failed to Display Boot Logo! Status = %r\n", __FUNCTION__, Status));
   }
+#endif
 
   // Run Boot Mode Config
   switch (BootMode) {
@@ -261,13 +264,13 @@ PlatformBootManagerAfterConsole ()
       ASSERT_EFI_ERROR (EFI_UNSUPPORTED);
   }
 
-  // Proccess Capsules
-  ProcessCapsules ();
-
 #ifdef XNU_PAYLOAD_BOOT
   // The RAM payload is the boot target; do not try installed boot options first.
   XnuLoaderMain ();
 #endif
+
+  // Proccess Capsules
+  ProcessCapsules ();
 }
 
 VOID

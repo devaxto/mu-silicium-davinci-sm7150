@@ -23,7 +23,7 @@
   BUILD_TARGETS                  = RELEASE|DEBUG
   SKUID_IDENTIFIER               = DEFAULT
   FLASH_DEFINITION               = davinciPkg/davinci.fdf
-  USE_CUSTOM_DISPLAY_DRIVER      = 1
+  USE_CUSTOM_DISPLAY_DRIVER      = 0
   HAS_BUILD_IN_KEYBOARD          = 0
 
   #
@@ -65,7 +65,7 @@
   gQcomPkgTokenSpaceGuid.PcdPlatformType|"WP"
 
   # Dynamic RAM Start Address
-  gQcomPkgTokenSpaceGuid.PcdRamPartitionBase|0xB0000000
+  gQcomPkgTokenSpaceGuid.PcdRamPartitionBase|0xD0000000
 
   # USB Controller
   gQcomPkgTokenSpaceGuid.PcdStartUsbController|FALSE

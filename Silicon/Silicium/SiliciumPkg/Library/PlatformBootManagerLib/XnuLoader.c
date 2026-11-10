@@ -55,6 +55,9 @@ Log (
 #define READ_SYSREG(Name) ({ UINT64 _Value; __asm__ volatile ("mrs %0, " #Name : "=r" (_Value)); _Value; })
 
 #ifndef XNU_NO_DISK_LOG
+STATIC UINT64  mLogLbaOffset;
+STATIC BOOLEAN mConnected;
+
 STATIC
 EFI_BLOCK_IO_PROTOCOL *
 FindPartition (
@@ -64,27 +67,57 @@ FindPartition (
   EFI_HANDLE *Handles;
   UINTN       Count;
 
-  Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiPartitionInfoProtocolGuid, NULL, &Count, &Handles);
-  if (EFI_ERROR (Status)) {
-    return NULL;
+  mLogLbaOffset = 0;
+
+  if (!mConnected) {
+    mConnected = TRUE;
+    Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiBlockIoProtocolGuid, NULL, &Count, &Handles);
+    if (!EFI_ERROR (Status)) {
+      for (UINTN i = 0; i < Count; i++) {
+        gBS->ConnectController (Handles[i], NULL, NULL, TRUE);
+      }
+      FreePool (Handles);
+    }
   }
 
-  for (UINTN i = 0; i < Count; i++) {
-    EFI_PARTITION_INFO_PROTOCOL *Info;
-    EFI_BLOCK_IO_PROTOCOL       *BlockIo;
+  Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiPartitionInfoProtocolGuid, NULL, &Count, &Handles);
+  if (!EFI_ERROR (Status)) {
+    for (UINTN i = 0; i < Count; i++) {
+      EFI_PARTITION_INFO_PROTOCOL *Info;
+      EFI_BLOCK_IO_PROTOCOL       *BlockIo;
 
-    Status = gBS->HandleProtocol (Handles[i], &gEfiPartitionInfoProtocolGuid, (VOID **)&Info);
-    if (EFI_ERROR (Status) || Info->Type != PARTITION_TYPE_GPT) {
-      continue;
+      Status = gBS->HandleProtocol (Handles[i], &gEfiPartitionInfoProtocolGuid, (VOID **)&Info);
+      if (EFI_ERROR (Status) || Info->Type != PARTITION_TYPE_GPT) {
+        continue;
+      }
+
+      if (StrnCmp (Info->Info.Gpt.PartitionName, Name, 36) != 0) {
+        continue;
+      }
+
+      Status = gBS->HandleProtocol (Handles[i], &gEfiBlockIoProtocolGuid, (VOID **)&BlockIo);
+      if (!EFI_ERROR (Status)) {
+        return BlockIo;
+      }
     }
+  }
 
-    if (StrnCmp (Info->Info.Gpt.PartitionName, Name, 36) != 0) {
-      continue;
-    }
+  // Fallback for davinci when PartitionDxe is not bound: write directly to sda25 (logdump) on LUN 0.
+  Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiBlockIoProtocolGuid, NULL, &Count, &Handles);
+  if (!EFI_ERROR (Status)) {
+    for (UINTN i = 0; i < Count; i++) {
+      EFI_BLOCK_IO_PROTOCOL *BlockIo;
 
-    Status = gBS->HandleProtocol (Handles[i], &gEfiBlockIoProtocolGuid, (VOID **)&BlockIo);
-    if (!EFI_ERROR (Status)) {
-      return BlockIo;
+      Status = gBS->HandleProtocol (Handles[i], &gEfiBlockIoProtocolGuid, (VOID **)&BlockIo);
+      if (EFI_ERROR (Status) || BlockIo->Media == NULL) {
+        continue;
+      }
+
+      if (!BlockIo->Media->LogicalPartition && BlockIo->Media->BlockSize == 4096 &&
+          BlockIo->Media->LastBlock + 1 == 15304704ULL) {
+        mLogLbaOffset = 1359872ULL;
+        return BlockIo;
+      }
     }
   }
 
@@ -229,7 +262,7 @@ FlushLog ()
   BlockSize = BlockIo->Media->BlockSize;
   WriteSize = ALIGN_VALUE (mLogLen + 1, BlockSize);
 
-  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, 0, WriteSize, mLog);
+  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, mLogLbaOffset, WriteSize, mLog);
   if (!EFI_ERROR (Status)) {
     BlockIo->FlushBlocks (BlockIo);
   }
